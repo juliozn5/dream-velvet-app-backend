@@ -12,7 +12,7 @@ class BroadcastServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Broadcast::routes();
+        Broadcast::routes(['middleware' => ['auth:sanctum']]);
 
         // En Laravel 11, routes/channels.php ya se carga en routes() o similar,
         // pero cargarlo aquí explícitamente evita problemas si `bootstrap/app.php` no lo hace bien.

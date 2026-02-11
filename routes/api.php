@@ -41,6 +41,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/models', [\App\Http\Controllers\Api\SearchController::class, 'models']);
 
     // Chat
+    Route::get('/chat', [\App\Http\Controllers\Api\ChatController::class, 'index']); // Lista de conversaciones
     Route::get('/chat/{userId}', [\App\Http\Controllers\Api\ChatController::class, 'getMessages']);
     Route::post('/chat', [\App\Http\Controllers\Api\ChatController::class, 'sendMessage']);
 });

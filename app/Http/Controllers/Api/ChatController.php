@@ -12,6 +12,41 @@ use Illuminate\Support\Facades\Auth;
 class ChatController extends Controller
 {
     /**
+     * Obtener lista de conversaciones recientes (Bandeja de Entrada)
+     */
+    public function index()
+    {
+        $userId = Auth::id();
+
+        // Obtener todos los mensajes donde participo
+        $conversations = Message::where('sender_id', $userId)
+            ->orWhere('receiver_id', $userId)
+            ->with(['sender', 'receiver'])
+            ->orderBy('created_at', 'desc')
+            ->get()
+            // Agrupar por el ID del "otro" usuario
+            ->groupBy(function ($message) use ($userId) {
+                return $message->sender_id == $userId ? $message->receiver_id : $message->sender_id;
+            })
+            ->map(function ($messages) use ($userId) {
+                $lastMessage = $messages->first();
+                $otherUser = $lastMessage->sender_id == $userId ? $lastMessage->receiver : $lastMessage->sender;
+
+                return [
+                    'id' => $otherUser->id,
+                    'name' => $otherUser->name,
+                    'avatar' => $otherUser->avatar,
+                    'last_message' => $lastMessage->content,
+                    'time' => $lastMessage->created_at,
+                    'unread' => $messages->where('receiver_id', $userId)->whereNull('read_at')->count(),
+                ];
+            })
+            ->values(); // Resetear keys para que sea array JSON
+
+        return response()->json($conversations);
+    }
+
+    /**
      * Enviar un mensaje
      */
     public function sendMessage(Request $request)

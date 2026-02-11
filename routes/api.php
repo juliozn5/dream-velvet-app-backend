@@ -37,5 +37,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Feed (Mock)
     Route::get('/feed', [\App\Http\Controllers\Api\FeedController::class, 'index']);
 
-    // TODO: Mensajería y Feed (Fases siguientes)
+    // Búsqueda
+    Route::get('/models', [\App\Http\Controllers\Api\SearchController::class, 'models']);
+
+    // Chat
+    Route::get('/chat/{userId}', [\App\Http\Controllers\Api\ChatController::class, 'getMessages']);
+    Route::post('/chat', [\App\Http\Controllers\Api\ChatController::class, 'sendMessage']);
 });

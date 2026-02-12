@@ -2,9 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Models\User;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\ValidationException;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ChatController;
 
 /*
 |--------------------------------------------------------------------------
@@ -17,77 +16,27 @@ use Illuminate\Validation\ValidationException;
 |
 */
 
-// Auth Routes (Login)
-Route::post('/login', function (Request $request) {
-    $request->validate([
-        'email' => 'required|email',
-        'password' => 'required',
-    ]);
+// Auth publica
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
 
-    $user = User::where('email', $request->email)->first();
-
-    if (!$user || !Hash::check($request->password, $user->password)) {
-        throw ValidationException::withMessages([
-            'email' => ['Credenciales incorrectas.'],
-        ]);
-    }
-
-    // Revocar tokens anteriores (opcional, para limpieza)
-    // $user->tokens()->delete();
-
-    $token = $user->createToken('auth_token')->plainTextToken;
-
-    return response()->json([
-        'token' => $token,
-        'user' => $user,
-        'token_type' => 'Bearer',
-    ]);
-});
-
-Route::post('/register', function (Request $request) {
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|string|email|max:255|unique:users',
-        'password' => 'required|string|min:8|confirmed',
-    ]);
-
-    $user = User::create([
-        'name' => $request->name,
-        'email' => $request->email,
-        'password' => Hash::make($request->password),
-    ]);
-
-    $token = $user->createToken('auth_token')->plainTextToken;
-
-    return response()->json([
-        'token' => $token,
-        'user' => $user,
-        'token_type' => 'Bearer',
-    ]);
-});
-
-// Protected Routes
+// Rutas protegidas
 Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
+    // Auth actions
+    Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/user', [AuthController::class, 'user']);
 
-    Route::post('/logout', function (Request $request) {
-        $request->user()->currentAccessToken()->delete();
-        return response()->json(['message' => 'Logged out successfully']);
-    });
+    // Chat
+    Route::get('/chat', [ChatController::class, 'index']);
+    Route::get('/chat/{userId}', [ChatController::class, 'getMessages']);
+    Route::post('/chat', [ChatController::class, 'sendMessage']);
 
-    // Chat Controller
-    Route::get('/chat', [\App\Http\Controllers\Api\ChatController::class, 'index']);
-    Route::get('/chat/{userId}', [\App\Http\Controllers\Api\ChatController::class, 'getMessages']);
-    Route::post('/chat', [\App\Http\Controllers\Api\ChatController::class, 'sendMessage']);
-
-    // User Details
+    // User Details (Usado por el chat para mostrar avatar)
     Route::get('/users/{id}', function ($id) {
-        return User::select('id', 'name', 'avatar', 'role')->findOrFail($id);
+        return \App\Models\User::select('id', 'name', 'avatar', 'role')->findOrFail($id);
     });
 
-    // Búsqueda (si existía)
+    // Rutas adicionales que vi en logs anteriores
     // Route::get('/models', [\App\Http\Controllers\Api\SearchController::class, 'models']);
 });
 
@@ -95,24 +44,27 @@ Route::middleware(['auth:sanctum'])->group(function () {
 Route::get('/debug-pusher', function (Request $request) {
     try {
         $id = $request->query('id', 1);
-        $user = User::find($id)
-            ?? new User(['id' => $id, 'name' => 'TargetUser']);
+        $user = \App\Models\User::findOrFail($id);
 
         $msg = new \App\Models\Message([
-            'sender_id' => 999123,
+            'sender_id' => 999999, // Fake sender ID
             'receiver_id' => $user->id,
-            'content' => 'DEBUG MSG ' . now()->toTimeString()
+            'content' => 'DEBUG MSG from Backend at ' . now()->toTimeString()
         ]);
 
         // Disparar evento
         broadcast(new \App\Events\MessageSent($msg));
 
         return [
-            "status" => "Enviado a chat.{$user->id}",
+            "status" => "Evento enviado a chat.{$user->id}",
+            "msg_content" => $msg->content,
             "cluster" => env('PUSHER_APP_CLUSTER'),
-            "event_name" => (new \App\Events\MessageSent($msg))->broadcastAs()
+            "event_class" => \App\Events\MessageSent::class,
         ];
     } catch (\Exception $e) {
-        return ['error' => $e->getMessage()];
+        return [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ];
     }
 });

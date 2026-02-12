@@ -29,8 +29,6 @@ Route::post('/login', [AuthController::class, 'login']);
 
 // Rutas Protegidas (Auth Sanctum)
 Route::middleware(['auth:sanctum'])->group(function () {
-    Broadcast::routes(); // Habilita canales privados (notificaciones)
-
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 

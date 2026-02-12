@@ -65,12 +65,18 @@ class ChatController extends Controller
             'content' => $request->message,
         ]);
 
-        // Emitir evento a Pusher
+        // Emitir evento a Pusher (Chat en tiempo real, para la conversación activa)
         broadcast(new MessageSent($message));
+
+        // Enviar Notificación Sistema (Campanita, Toast Global, Persistencia en BD)
+        $receiver = User::find($receiverId);
+        if ($receiver) {
+            $receiver->notify(new \App\Notifications\NewMessageNotification($message->load('sender')));
+        }
 
         return response()->json([
             'status' => 'Message Sent!',
-            'message' => $message->load('sender')
+            'message' => $message
         ]);
     }
 

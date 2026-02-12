@@ -49,19 +49,24 @@ Route::middleware(['auth:sanctum'])->group(function () {
         return \App\Models\User::select('id', 'name', 'avatar', 'role')->findOrFail($id);
     });
 
-    // Debug Pusher
-    Route::get('/debug-pusher', function () {
-        try {
-            $user = \App\Models\User::first() ?? new \App\Models\User(['id' => 1, 'name' => 'Test']);
-            $msg = new \App\Models\Message([
-                'sender_id' => $user->id,
-                'receiver_id' => $user->id,
-                'content' => 'DEBUG PUSHER ' . now()
-            ]);
-            broadcast(new \App\Events\MessageSent($msg));
-            return ['status' => 'Sent', 'env_cluster' => env('PUSHER_APP_CLUSTER'), 'env_key' => substr(env('PUSHER_APP_KEY'), 0, 5) . '...'];
-        } catch (\Exception $e) {
-            return ['error' => $e->getMessage()];
-        }
+    Route::get('/users/{id}', function ($id) {
+        return \App\Models\User::select('id', 'name', 'avatar', 'role')->findOrFail($id);
     });
+});
+
+// Debug Pusher (Público)
+Route::get('/debug-pusher', function () {
+    try {
+        $user = \App\Models\User::first() ?? new \App\Models\User(['id' => 1, 'name' => 'Test']);
+        $msg = new \App\Models\Message([
+            'sender_id' => $user->id,
+            'receiver_id' => $user->id,
+            'content' => 'DEBUG PUSHER ' . now()
+        ]);
+        // Usamos broadcast(new ...);
+        event(new \App\Events\MessageSent($msg));
+        return ['status' => 'Sent', 'env_cluster' => env('PUSHER_APP_CLUSTER'), 'env_key' => substr(env('PUSHER_APP_KEY'), 0, 5) . '...'];
+    } catch (\Exception $e) {
+        return ['error' => $e->getMessage()];
+    }
 });

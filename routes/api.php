@@ -27,8 +27,12 @@ Route::get('/ping', function () {
 Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
-// Rutas Protegidas (Auth Sanctum)
 Route::middleware(['auth:sanctum'])->group(function () {
+    // Ruta MANUAL de Auth para Pusher (Bypass magic)
+    Route::post('/broadcasting/auth', function (Illuminate\Http\Request $request) {
+        return Illuminate\Support\Facades\Broadcast::auth($request);
+    });
+
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::get('/user', [AuthController::class, 'user']);
 

@@ -40,8 +40,12 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Búsqueda
     Route::get('/models', [\App\Http\Controllers\Api\SearchController::class, 'models']);
 
-    // Chat
     Route::get('/chat', [\App\Http\Controllers\Api\ChatController::class, 'index']); // Lista de conversaciones
     Route::get('/chat/{userId}', [\App\Http\Controllers\Api\ChatController::class, 'getMessages']);
     Route::post('/chat', [\App\Http\Controllers\Api\ChatController::class, 'sendMessage']);
+
+    // Obtener detalles de usuario (para el chat)
+    Route::get('/users/{id}', function ($id) {
+        return \App\Models\User::select('id', 'name', 'avatar', 'role')->findOrFail($id);
+    });
 });

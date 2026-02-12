@@ -66,7 +66,7 @@ class ChatController extends Controller
         ]);
 
         // Emitir evento a Pusher
-        broadcast(new MessageSent($message))->toOthers();
+        broadcast(new MessageSent($message));
 
         return response()->json([
             'status' => 'Message Sent!',
@@ -88,7 +88,7 @@ class ChatController extends Controller
             $q->where('sender_id', $userId)->where('receiver_id', $myId);
         })
             ->orderBy('created_at', 'asc')
-            ->with('sender')
+            ->with(['sender', 'receiver'])
             ->get();
 
         return response()->json($messages);

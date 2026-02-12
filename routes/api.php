@@ -28,9 +28,29 @@ Route::post('/register', [AuthController::class, 'register']);
 Route::post('/login', [AuthController::class, 'login']);
 
 Route::middleware(['auth:sanctum'])->group(function () {
-    // Ruta MANUAL de Auth para Pusher (Bypass magic)
+    // Ruta MANUAL de Auth para Pusher con DEBUG y Canal Explícito
     Route::post('/broadcasting/auth', function (Illuminate\Http\Request $request) {
-        return Illuminate\Support\Facades\Broadcast::auth($request);
+        $user = $request->user();
+
+        \Log::info("PUSHER AUTH HIT:", [
+            'user' => $user ? $user->id : 'GUEST',
+            'socket_id' => $request->socket_id,
+            'channel_name' => $request->channel_name
+        ]);
+
+        // Definir el canal AQUÍ MISMO para asegurar que existe
+        Illuminate\Support\Facades\Broadcast::channel('App.Models.User.{id}', function ($u, $id) {
+            return (int) $u->id === (int) $id;
+        });
+
+        try {
+            $response = Illuminate\Support\Facades\Broadcast::auth($request);
+            \Log::info("PUSHER AUTH RESPONSE:", ['content' => $response]);
+            return $response;
+        } catch (\Throwable $e) {
+            \Log::error("PUSHER AUTH ERROR: " . $e->getMessage());
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     });
 
     Route::post('/logout', [AuthController::class, 'logout']);

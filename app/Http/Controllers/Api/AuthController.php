@@ -32,8 +32,8 @@ class AuthController extends Controller
             'chat_price' => $request->role === 'modelo' ? 10 : 0,
         ]);
 
-        // Crear wallet inicial vacía
-        $user->wallet()->create(['balance' => 0]);
+        // Crear wallet con 1000 créditos iniciales
+        $user->wallet()->create(['balance' => 1000]);
 
         $token = $user->createToken('auth-token')->plainTextToken;
 

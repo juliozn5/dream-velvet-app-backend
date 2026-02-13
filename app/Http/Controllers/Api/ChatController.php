@@ -97,6 +97,47 @@ class ChatController extends Controller
             ->with(['sender', 'receiver'])
             ->get();
 
+        // Marcar como leídos los mensajes que he recibido de este usuario
+        Message::where('sender_id', $userId)
+            ->where('receiver_id', $myId)
+            ->whereNull('read_at')
+            ->update(['read_at' => now()]);
+
         return response()->json($messages);
+    }
+    /**
+     * Eliminar conversación y volver a bloquear chat
+     */
+    public function destroy($userId)
+    {
+        $myId = Auth::id();
+
+        try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            // 1. Eliminar mensajes entre ambos usuarios
+            Message::where(function ($q) use ($myId, $userId) {
+                $q->where('sender_id', $myId)->where('receiver_id', $userId);
+            })->orWhere(function ($q) use ($myId, $userId) {
+                $q->where('sender_id', $userId)->where('receiver_id', $myId);
+            })->delete();
+
+            // 2. Revocar desbloqueo (ChatUnlock)
+            // Borramos cualquier registro donde participate esta pareja, sin importar quién es quién en el unlock
+            // (Para forzar que EL CLIENTE tenga que pagar de nuevo)
+            \App\Models\ChatUnlock::where(function ($q) use ($myId, $userId) {
+                $q->where('user_id', $myId)->where('model_id', $userId);
+            })->orWhere(function ($q) use ($myId, $userId) {
+                $q->where('user_id', $userId)->where('model_id', $myId);
+            })->delete();
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json(['message' => 'Chat eliminado y bloqueado nuevamente']);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return response()->json(['error' => 'Error al eliminar chat'], 500);
+        }
     }
 }

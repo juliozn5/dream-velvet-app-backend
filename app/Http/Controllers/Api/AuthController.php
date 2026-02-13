@@ -29,6 +29,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'role' => $request->role,
             'avatar' => 'https://ui-avatars.com/api/?name=' . urlencode($request->name) . '&background=random',
+            'chat_price' => $request->role === 'modelo' ? 10 : 0,
         ]);
 
         // Crear wallet inicial vacía
@@ -91,5 +92,36 @@ class AuthController extends Controller
         return response()->json(
             $request->user()->load('wallet')
         );
+    }
+
+    /**
+     * Actualizar perfil (incluyendo precio de chat para modelos)
+     */
+    public function updateProfile(Request $request)
+    {
+        $user = $request->user();
+
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email,' . $user->id,
+            'bio' => 'nullable|string|max:1000',
+            'chat_price' => 'nullable|integer|min:0',
+        ]);
+
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->bio = $request->bio;
+
+        // Solo actualizamos precio si es modelo
+        if ($user->isModel() && $request->has('chat_price')) {
+            $user->chat_price = $request->chat_price;
+        }
+
+        $user->save();
+
+        return response()->json([
+            'message' => 'Perfil actualizado correctamente',
+            'user' => $user
+        ]);
     }
 }

@@ -23,6 +23,22 @@ class SearchController extends Controller
             });
         }
 
-        return response()->json($query->get());
+        $models = $query->get()->map(function ($model) use ($request) {
+            // Verificar si el usuario actual ha desbloqueado a este modelo
+            $isUnlocked = \App\Models\ChatUnlock::where('user_id', $request->user()->id)
+                ->where('model_id', $model->id)
+                ->exists();
+
+            // Si el precio es 0, asumimos desbloqueado (o se maneja en frotnend)
+            // Pero mejor ser explícito
+            if (($model->chat_price ?? 0) <= 0) {
+                $isUnlocked = true;
+            }
+
+            $model->is_unlocked = $isUnlocked;
+            return $model;
+        });
+
+        return response()->json($models);
     }
 }

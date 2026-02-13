@@ -19,7 +19,7 @@ class DatabaseSeeder extends Seeder
         $cliente = User::create([
             'name' => 'Julio Cliente',
             'email' => 'julio@test.com',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role' => 'cliente',
             'avatar' => 'https://ui-avatars.com/api/?name=Julio+Cliente&background=0D8ABC&color=fff',
             'is_online' => true,
@@ -30,7 +30,7 @@ class DatabaseSeeder extends Seeder
         $modelo = User::create([
             'name' => 'Valentina Rose',
             'email' => 'valentina@test.com',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role' => 'modelo',
             'avatar' => 'https://i.pravatar.cc/150?u=valentina',
             'bio' => 'Modelo exclusiva. Contenido diario 📸',
@@ -43,13 +43,13 @@ class DatabaseSeeder extends Seeder
         $admin = User::create([
             'name' => 'Admin User',
             'email' => 'admin@test.com',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('12345678'),
             'role' => 'admin',
         ]);
         $admin->wallet()->create(['balance' => 999999]);
 
         echo "Usuarios creados:\n";
-        echo "- Cliente: julio@test.com / password\n";
-        echo "- Modelo: valentina@test.com / password\n";
+        echo "- Cliente: julio@test.com / 12345678\n";
+        echo "- Modelo: valentina@test.com / 12345678\n";
     }
 }

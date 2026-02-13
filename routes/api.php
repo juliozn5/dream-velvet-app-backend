@@ -60,6 +60,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/wallet', [WalletController::class, 'index']); // Balance
     Route::get('/wallet/history', [WalletController::class, 'transactions']);
     Route::post('/wallet/purchase', [WalletController::class, 'purchase']); // Mock
+    Route::post('/wallet/unlock-chat', [WalletController::class, 'unlockChat']);
+
+    // Profile Update
+    Route::post('/profile/update', [AuthController::class, 'updateProfile']);
 
     // Feed (Mock)
     Route::get('/feed', [FeedController::class, 'index']);
@@ -71,6 +75,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/chat', [ChatController::class, 'index']); // Lista de conversaciones
     Route::get('/chat/{userId}', [ChatController::class, 'getMessages']);
     Route::post('/chat', [ChatController::class, 'sendMessage']);
+    Route::delete('/chat/{userId}', [ChatController::class, 'destroy']);
 
     // Obtener detalles de usuario (para el chat)
     Route::get('/users/{id}', function ($id) {
@@ -108,4 +113,32 @@ Route::get('/debug-pusher', function (Request $request) {
     } catch (\Exception $e) {
         return ['error' => $e->getMessage()];
     }
+});
+
+// Custom Broadcasting Auth Route for API (Sanctum)
+Route::middleware('auth:sanctum')->post('/broadcasting/auth', function (Request $request) {
+    return Broadcast::auth($request);
+});
+
+Route::get('/debug-wallets', function () {
+    $users = \App\Models\User::with('wallet')->get();
+    $data = $users->map(function ($u) {
+        return [
+            'user_id' => $u->id,
+            'name' => $u->name,
+            'wallet_id' => $u->wallet ? $u->wallet->id : 'NO WALLET',
+            'balance' => $u->wallet ? $u->wallet->balance : 0,
+            'wallet_user_id' => $u->wallet ? $u->wallet->user_id : 'NsA',
+        ];
+    });
+
+    // Check duplicates
+    $walletIds = $users->pluck('wallet.id')->filter();
+    $duplicates = $walletIds->diffAssoc($walletIds->unique());
+
+    return [
+        'wallet_integrity_check' => $duplicates->isEmpty() ? 'OK' : 'FAIL - DUPLICATE WALLETS DETECTED',
+        'duplicates' => $duplicates,
+        'users_data' => $data
+    ];
 });

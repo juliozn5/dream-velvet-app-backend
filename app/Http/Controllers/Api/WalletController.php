@@ -14,12 +14,11 @@ class WalletController extends Controller
      */
     public function index(Request $request)
     {
-        $wallet = $request->user()->wallet;
-
-        // Si por alguna razón no tiene wallet, se la creamos
-        if (!$wallet) {
-            $wallet = $request->user()->wallet()->create(['balance' => 0]);
-        }
+        // Asegurar que obtenemos la wallet del usuario autenticado por su ID explícito
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $request->user()->id],
+            ['balance' => 0]
+        );
 
         return response()->json($wallet);
     }
@@ -49,7 +48,11 @@ class WalletController extends Controller
             'package_name' => 'required|string',
         ]);
 
-        $wallet = $request->user()->wallet;
+        // Buscar wallet explícitamente por user_id
+        $wallet = Wallet::firstOrCreate(
+            ['user_id' => $request->user()->id],
+            ['balance' => 0]
+        );
 
         // Usamos nuestro modelo Wallet que ya tiene el helper deposit()
         $transaction = $wallet->deposit(
@@ -61,7 +64,84 @@ class WalletController extends Controller
         return response()->json([
             'message' => 'Compra exitosa',
             'balance' => $wallet->fresh()->balance,
-            'transaction' => $transaction,
         ]);
+    }
+
+    /**
+     * Desbloquear chat con modelo
+     */
+    public function unlockChat(Request $request)
+    {
+        $request->validate([
+            'model_id' => 'required|exists:users,id',
+        ]);
+
+        $user = $request->user();
+        $model = \App\Models\User::findOrFail($request->model_id);
+
+        if (!$model->isModel()) {
+            return response()->json(['error' => 'El usuario no es modelo'], 400);
+        }
+
+        if ($user->id === $model->id) {
+            return response()->json(['error' => 'No puedes desbloquearte a ti mismo'], 400);
+        }
+
+        // Verificar si ya está desbloqueado
+        $alreadyUnlocked = \App\Models\ChatUnlock::where('user_id', $user->id)
+            ->where('model_id', $model->id)
+            ->exists();
+
+        if ($alreadyUnlocked) {
+            return response()->json(['message' => 'Chat ya desbloqueado', 'already_unlocked' => true]);
+        }
+
+        $price = $model->chat_price ?? 0;
+
+        if ($price <= 0) {
+            // Si es gratis, registrar unlock sin cobro
+            \App\Models\ChatUnlock::create([
+                'user_id' => $user->id,
+                'model_id' => $model->id,
+                'amount' => 0
+            ]);
+            return response()->json(['message' => 'Chat desbloqueado gratis']);
+        }
+
+        $wallet = $user->wallet;
+        if (!$wallet || $wallet->balance < $price) {
+            return response()->json(['error' => 'Saldo insuficiente'], 402);
+        }
+
+        try {
+            \Illuminate\Support\Facades\DB::beginTransaction();
+
+            // 1. Cobrar al usuario
+            $wallet->withdraw($price, 'chat_unlock', "Desbloqueo de chat con {$model->name}");
+
+            // 2. Acreditar al SISTEMA (Registro de ganancia de la plataforma)
+            // NO se le deposita a la modelo directamente.
+            \App\Models\SystemProfit::create([
+                'user_id' => $user->id,
+                'model_id' => $model->id,
+                'amount' => $price,
+                'source' => 'chat_unlock'
+            ]);
+
+            // 3. Registrar desbloqueo
+            \App\Models\ChatUnlock::create([
+                'user_id' => $user->id,
+                'model_id' => $model->id,
+                'amount' => $price
+            ]);
+
+            \Illuminate\Support\Facades\DB::commit();
+
+            return response()->json(['message' => 'Chat desbloqueado exitosamente', 'balance' => $wallet->fresh()->balance]);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\DB::rollBack();
+            return response()->json(['error' => 'Error al procesar desbloqueo: ' . $e->getMessage()], 500);
+        }
     }
 }

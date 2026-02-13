@@ -71,6 +71,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Búsqueda
     Route::get('/models', [SearchController::class, 'models']);
 
+    Route::get('/fast-content', [App\Http\Controllers\Api\FastContentController::class, 'index']);
+    Route::post('/fast-content', [App\Http\Controllers\Api\FastContentController::class, 'store']);
+    Route::delete('/fast-content/{id}', [App\Http\Controllers\Api\FastContentController::class, 'destroy']);
+
     // Chat
     Route::get('/chat', [ChatController::class, 'index']); // Lista de conversaciones
     Route::get('/chat/{userId}', [ChatController::class, 'getMessages']);
@@ -119,6 +123,8 @@ Route::get('/debug-pusher', function (Request $request) {
 Route::middleware('auth:sanctum')->post('/broadcasting/auth', function (Request $request) {
     return Broadcast::auth($request);
 });
+
+Route::middleware('auth:sanctum')->post('/messages/{id}/unlock', [App\Http\Controllers\Api\ChatController::class, 'unlockMessage']);
 
 Route::get('/debug-wallets', function () {
     $users = \App\Models\User::with('wallet')->get();

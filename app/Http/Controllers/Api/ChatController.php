@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Events\MessageSent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class ChatController extends Controller
 {
@@ -53,25 +54,43 @@ class ChatController extends Controller
     {
         $request->validate([
             'receiver_id' => 'required|exists:users,id',
-            'message' => 'required|string',
+            'message' => 'nullable|string',
+            'fast_content_id' => 'nullable|exists:fast_contents,id',
         ]);
 
         $sender = Auth::user();
-        $receiverId = $request->receiver_id;
+
+        // Validar que se envíe o texto o contenido
+        if (!$request->message && !$request->fast_content_id) {
+            return response()->json(['error' => 'Message or content required'], 422);
+        }
+
+        // Si envía contenido rápido, verificar que le pertenezca
+        if ($request->fast_content_id) {
+            $content = \App\Models\FastContent::find($request->fast_content_id);
+            if ($content->user_id !== $sender->id) {
+                return response()->json(['error' => 'Unauthorized content access'], 403);
+            }
+        }
 
         $message = Message::create([
             'sender_id' => $sender->id,
-            'receiver_id' => $receiverId,
-            'content' => $request->message,
+            'receiver_id' => $request->receiver_id,
+            'content' => $request->message ?? '', // Puede estar vacío si manda solo foto
+            'fast_content_id' => $request->fast_content_id,
+            'is_paid' => false, // Por defecto no pagado (si tiene precio > 0)
         ]);
 
-        // Emitir evento a Pusher (Chat en tiempo real, para la conversación activa)
+        // Cargar relación para que el evento lleve la info del contenido
+        $message->load(['sender', 'fastContent']);
+
+        // Emitir evento a Pusher
         broadcast(new MessageSent($message));
 
-        // Enviar Notificación Sistema (Campanita, Toast Global, Persistencia en BD)
-        $receiver = User::find($receiverId);
+        // Enviar notificación
+        $receiver = User::find($request->receiver_id);
         if ($receiver) {
-            $receiver->notify(new \App\Notifications\NewMessageNotification($message->load('sender')));
+            $receiver->notify(new \App\Notifications\NewMessageNotification($message));
         }
 
         return response()->json([
@@ -94,7 +113,7 @@ class ChatController extends Controller
             $q->where('sender_id', $userId)->where('receiver_id', $myId);
         })
             ->orderBy('created_at', 'asc')
-            ->with(['sender', 'receiver'])
+            ->with(['sender', 'receiver', 'fastContent'])
             ->get();
 
         // Marcar como leídos los mensajes que he recibido de este usuario
@@ -138,6 +157,56 @@ class ChatController extends Controller
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\DB::rollBack();
             return response()->json(['error' => 'Error al eliminar chat'], 500);
+        }
+    }
+    /**
+     * Desbloquear mensaje (simulación de pago)
+     */
+    public function unlockMessage($id)
+    {
+        $message = Message::with(['fastContent', 'sender.wallet'])->findOrFail($id);
+
+        if (!$message->fastContent) {
+            return response()->json(['error' => 'Contenido no encontrado'], 404);
+        }
+
+        $user = Auth::user();
+        $user->load('wallet'); // Cargar billetera
+
+        // Verificar si ya está pagado
+        if ($message->is_paid) {
+            return response()->json(['message' => $message]);
+        }
+
+        $price = $message->fastContent->price;
+        $balance = $user->wallet ? $user->wallet->balance : 0;
+
+        if ($balance < $price) {
+            return response()->json([
+                'error' => 'Saldo insuficiente',
+                'current_balance' => $balance,
+                'required' => $price
+            ], 402);
+        }
+
+        try {
+            // Realizar transacción (usando modelo Wallet)
+            if ($user->wallet) {
+                $user->wallet->withdraw($price, 'unlock_content', "Desbloqueo mensaje #{$id}");
+            }
+
+            // NOTA: NO transferimos a la modelo. El dinero va al sistema.
+
+            $message->update(['is_paid' => true]);
+
+            return response()->json([
+                'status' => 'Unlocked',
+                'message' => $message->load(['sender', 'fastContent'])
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error("Unlock error: " . $e->getMessage());
+            return response()->json(['error' => 'Error en la transacción: ' . $e->getMessage()], 500);
         }
     }
 }

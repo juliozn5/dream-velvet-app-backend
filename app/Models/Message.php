@@ -9,7 +9,15 @@ class Message extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['sender_id', 'receiver_id', 'content', 'read_at'];
+    protected $fillable = [
+        'sender_id',
+        'receiver_id',
+        'content',
+        'is_read',
+        'read_at',
+        'fast_content_id',
+        'is_paid',
+    ];
 
     public function sender()
     {
@@ -19,5 +27,10 @@ class Message extends Model
     public function receiver()
     {
         return $this->belongsTo(User::class, 'receiver_id');
+    }
+
+    public function fastContent()
+    {
+        return $this->belongsTo(FastContent::class, 'fast_content_id');
     }
 }

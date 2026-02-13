@@ -10,8 +10,9 @@ return new class extends Migration {
      */
     public function up(): void
     {
-        // Usamos modify column directo porque doctrine/dbal podría no estar listo
-        \DB::statement("ALTER TABLE transactions MODIFY COLUMN type VARCHAR(50) NOT NULL");
+        Schema::table('transactions', function (Blueprint $table) {
+            $table->string('type', 50)->change();
+        });
     }
 
     /**

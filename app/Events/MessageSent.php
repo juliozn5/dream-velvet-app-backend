@@ -22,8 +22,8 @@ class MessageSent implements ShouldBroadcastNow
      */
     public function __construct(Message $message)
     {
-        // Cargar las relaciones para que el front tenga la info del sender
-        $this->message = $message->load('sender');
+        // Cargar las relaciones para que el front tenga la info del sender y el contenido rápido
+        $this->message = $message->load(['sender', 'fastContent']);
     }
 
     /**

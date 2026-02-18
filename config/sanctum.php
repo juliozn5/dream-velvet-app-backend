@@ -19,7 +19,7 @@ return [
         '%s%s%s',
         'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
         Sanctum::currentApplicationUrlWithPort(),
-        ',dream-velvet-app-backend-production.up.railway.app'
+        ',libertaduseche1771358557498.1640266.misitiohostgator.com'
     ))),
 
     /*

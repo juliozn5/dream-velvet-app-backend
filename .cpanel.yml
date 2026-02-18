@@ -1,0 +1,73 @@
+---
+deployment:
+  tasks:
+    # =========================================================
+    # 1. Navegar al directorio del repositorio desplegado
+    # =========================================================
+    - export DEPLOYPATH=/home/$USER/repositories/backend-api
+
+    # =========================================================
+    # 2. Instalar dependencias de PHP con Composer
+    #    --no-dev        → No instala paquetes de desarrollo
+    #    --no-interaction → Sin preguntas interactivas
+    #    --optimize-autoloader → Optimiza el autoloader para producción
+    # =========================================================
+    - /opt/cpanel/composer/bin/composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --working-dir=$DEPLOYPATH
+
+    # =========================================================
+    # 3. Copiar .env si no existe (primera vez)
+    #    IMPORTANTE: Debes configurar tu .env manualmente en el
+    #    servidor después del primer despliegue.
+    # =========================================================
+    - if [ ! -f $DEPLOYPATH/.env ]; then cp $DEPLOYPATH/.env.example $DEPLOYPATH/.env; fi
+
+    # =========================================================
+    # 4. Generar APP_KEY si no está definida
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan key:generate --force --no-interaction
+
+    # =========================================================
+    # 5. Instalar dependencias de Node.js y compilar assets
+    #    (Vite + Tailwind CSS)
+    # =========================================================
+    - cd $DEPLOYPATH && npm install --production=false
+    - cd $DEPLOYPATH && npm run build
+
+    # =========================================================
+    # 6. Ejecutar migraciones de base de datos
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan migrate --force --no-interaction
+
+    # =========================================================
+    # 7. Crear el enlace simbólico de storage
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan storage:link --force --no-interaction
+
+    # =========================================================
+    # 8. Limpiar y reconstruir cachés para producción
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan config:cache
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan route:cache
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan view:cache
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan event:cache
+
+    # =========================================================
+    # 9. Publicar assets de Filament (panel de administración)
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan filament:assets
+
+    # =========================================================
+    # 10. Optimizar el autoloader de Laravel
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan optimize
+
+    # =========================================================
+    # 11. Asegurar permisos correctos en storage y cache
+    # =========================================================
+    - chmod -R 775 $DEPLOYPATH/storage
+    - chmod -R 775 $DEPLOYPATH/bootstrap/cache
+
+    # =========================================================
+    # 12. Reiniciar las colas si están activas (supervisor)
+    # =========================================================
+    - cd $DEPLOYPATH && /usr/local/bin/php artisan queue:restart

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\Api\SearchController;
 use App\Http\Controllers\Api\SupportTicketController;
+use App\Http\Controllers\Api\ContentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -100,6 +101,17 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/support/tickets/{id}', [SupportTicketController::class, 'show']);
     Route::post('/support/tickets/{id}/reply', [SupportTicketController::class, 'reply']);
     Route::post('/support/tickets/{id}/close', [SupportTicketController::class, 'close']);
+
+    // Contenido (Posts, Reels, Stories, Highlights)
+    Route::post('/content/post', [ContentController::class, 'storePost']);
+    Route::post('/content/story', [ContentController::class, 'storeStory']);
+    Route::post('/content/highlight', [ContentController::class, 'storeHighlight']);
+    Route::get('/content/my-posts', [ContentController::class, 'myPosts']);
+    Route::get('/content/my-stories', [ContentController::class, 'myStories']);
+    Route::get('/content/my-highlights', [ContentController::class, 'myHighlights']);
+    Route::get('/content/user/{userId}/posts', [ContentController::class, 'userPosts']);
+    Route::delete('/content/post/{id}', [ContentController::class, 'destroyPost']);
+    Route::delete('/content/story/{id}', [ContentController::class, 'destroyStory']);
 });
 
 // Debug Pusher (Público) con ID dinámico

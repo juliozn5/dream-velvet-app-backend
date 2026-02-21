@@ -95,6 +95,21 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(CoinTransaction::class, 'model_id');
     }
 
+    public function posts(): HasMany
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    public function stories(): HasMany
+    {
+        return $this->hasMany(Story::class);
+    }
+
+    public function highlights(): HasMany
+    {
+        return $this->hasMany(Highlight::class);
+    }
+
     // Métodos Helper
     public function isAdmin(): bool
     {

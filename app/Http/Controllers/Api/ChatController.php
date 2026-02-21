@@ -199,6 +199,24 @@ class ChatController extends Controller
 
             $message->update(['is_paid' => true]);
 
+            // Registrar transacción de monedas (tracking detallado)
+            \App\Models\CoinTransaction::create([
+                'user_id' => $user->id,
+                'model_id' => $message->sender_id,
+                'amount' => $price,
+                'type' => 'content_unlock',
+                'reference_id' => $message->id,
+                'description' => "Desbloqueo de contenido en mensaje #{$id}",
+            ]);
+
+            // Registrar ganancia del sistema
+            \App\Models\SystemProfit::create([
+                'user_id' => $user->id,
+                'model_id' => $message->sender_id,
+                'amount' => $price,
+                'source' => 'content_unlock',
+            ]);
+
             return response()->json([
                 'status' => 'Unlocked',
                 'message' => $message->load(['sender', 'fastContent'])

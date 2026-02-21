@@ -8,6 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 use Filament\Models\Contracts\FilamentUser;
@@ -78,6 +79,22 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasManyThrough(Transaction::class, Wallet::class);
     }
 
+    /**
+     * Transacciones de monedas gastadas por este usuario
+     */
+    public function coinTransactions(): HasMany
+    {
+        return $this->hasMany(CoinTransaction::class, 'user_id');
+    }
+
+    /**
+     * Transacciones de monedas recibidas como modelo
+     */
+    public function coinTransactionsAsModel(): HasMany
+    {
+        return $this->hasMany(CoinTransaction::class, 'model_id');
+    }
+
     // Métodos Helper
     public function isAdmin(): bool
     {
@@ -91,6 +108,6 @@ class User extends Authenticatable implements FilamentUser
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return in_array($this->role, ['admin', 'usuarios']);
+        return $this->role === 'admin';
     }
 }

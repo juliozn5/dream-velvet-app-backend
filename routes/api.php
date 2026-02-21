@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\WalletController;
 use App\Http\Controllers\Api\ChatController;
 use App\Http\Controllers\Api\FeedController;
 use App\Http\Controllers\Api\SearchController;
+use App\Http\Controllers\Api\SupportTicketController;
 
 /*
 |--------------------------------------------------------------------------
@@ -91,6 +92,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/notifications/unread-count', [\App\Http\Controllers\Api\NotificationController::class, 'unread_count']);
     Route::post('/notifications/{id}/read', [\App\Http\Controllers\Api\NotificationController::class, 'markAsRead']);
     Route::post('/notifications/mark-all-read', [\App\Http\Controllers\Api\NotificationController::class, 'markAllAsRead']);
+
+    // Soporte / Tickets
+    Route::get('/support/categories', [SupportTicketController::class, 'categories']);
+    Route::get('/support/tickets', [SupportTicketController::class, 'index']);
+    Route::post('/support/tickets', [SupportTicketController::class, 'store']);
+    Route::get('/support/tickets/{id}', [SupportTicketController::class, 'show']);
+    Route::post('/support/tickets/{id}/reply', [SupportTicketController::class, 'reply']);
+    Route::post('/support/tickets/{id}/close', [SupportTicketController::class, 'close']);
 });
 
 // Debug Pusher (Público) con ID dinámico

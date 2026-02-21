@@ -129,10 +129,20 @@ class WalletController extends Controller
             ]);
 
             // 3. Registrar desbloqueo
-            \App\Models\ChatUnlock::create([
+            $chatUnlock = \App\Models\ChatUnlock::create([
                 'user_id' => $user->id,
                 'model_id' => $model->id,
                 'amount' => $price
+            ]);
+
+            // 4. Registrar transacción de monedas (tracking detallado)
+            \App\Models\CoinTransaction::create([
+                'user_id' => $user->id,
+                'model_id' => $model->id,
+                'amount' => $price,
+                'type' => 'chat_unlock',
+                'reference_id' => $chatUnlock->id,
+                'description' => "Desbloqueo de chat con {$model->name}",
             ]);
 
             \Illuminate\Support\Facades\DB::commit();

@@ -67,8 +67,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Profile Update
     Route::post('/profile/update', [AuthController::class, 'updateProfile']);
 
-    // Feed (Mock)
+    // Feed
     Route::get('/feed', [FeedController::class, 'index']);
+    Route::get('/feed/stories', [FeedController::class, 'feedStories']);
 
     // Búsqueda
     Route::get('/models', [SearchController::class, 'models']);

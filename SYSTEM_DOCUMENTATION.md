@@ -30,6 +30,7 @@ backend-api/
 │   │   ├── Controllers/Api/
 │   │   │   ├── AuthController.php       # Registro, Login, Logout, Perfil
 │   │   │   ├── ChatController.php       # Chat (CRUD mensajes, desbloqueo contenido)
+│   │   │   ├── ContentController.php     # [NUEVO] Contenido (Posts, Reels, Stories, Highlights)
 │   │   │   ├── FastContentController.php # Contenido rápido (fotos/videos de pago)
 │   │   │   ├── FeedController.php       # Feed (Mock)
 │   │   │   ├── NotificationController.php # Notificaciones
@@ -44,7 +45,10 @@ backend-api/
 │   │   ├── Message.php           # Mensajes de chat
 │   │   ├── FastContent.php       # Contenido multimedia de pago
 │   │   ├── SystemProfit.php      # Ganancias del sistema
-│   │   └── CoinTransaction.php   # [NUEVO] Registro detallado de gasto de monedas
+│   │   ├── CoinTransaction.php   # [NUEVO] Registro detallado de gasto de monedas
+│   │   ├── Post.php              # [NUEVO] Publicaciones y Reels
+│   │   ├── Story.php             # [NUEVO] Historias (expiran en 24h)
+│   │   └── Highlight.php         # [NUEVO] Historias destacadas
 │   ├── Notifications/
 │   │   └── NewMessageNotification.php # Push notification de mensajes
 │   └── Providers/
@@ -53,7 +57,7 @@ backend-api/
 │       └── Filament/
 │           └── AdminPanelProvider.php # Configuración panel Filament
 ├── database/
-│   └── migrations/               # 15+ migraciones
+│   └── migrations/               # 21+ migraciones
 ├── routes/
 │   ├── api.php                   # Rutas API (Sanctum)
 │   ├── channels.php              # Broadcasting channels
@@ -755,3 +759,163 @@ Tabla con todos los mensajes del ticket, mostrando:
 | `app/Filament/Resources/SupportTicketResource/Pages/EditSupportTicket.php`                  | Página           | Edición con acciones rápidas                |
 | `app/Filament/Resources/SupportTicketResource/Pages/ViewSupportTicket.php`                  | Página           | Vista con conversación y botón de respuesta |
 | `app/Filament/Resources/SupportTicketResource/RelationManagers/MessagesRelationManager.php` | RelationManager  | Chat de respuestas del ticket               |
+
+---
+
+## 📸 Sistema de Contenido (Posts, Reels, Stories, Highlights)
+
+> **Fecha de implementación:** 2026-02-21
+
+### Concepto General
+
+El sistema de contenido permite a los usuarios subir publicaciones (posts), reels (videos cortos), historias (contenido temporal de 24h) e historias destacadas (highlights permanentes). **TODO** el contenido tiene un flag `is_exclusive` que determina si es público (visible para todos) o exclusivo (de pago, solo visible para suscriptores o mediante desbloqueo con monedas).
+
+### Tablas Nuevas
+
+#### Tabla `posts`
+
+| Columna          | Tipo      | Descripción                                         |
+| ---------------- | --------- | --------------------------------------------------- |
+| `id`             | bigint PK | ID autoincremental                                  |
+| `user_id`        | FK→users  | Usuario que subió el contenido                      |
+| `type`           | enum      | `'post'`, `'reel'`, `'live'` — Tipo de publicación  |
+| `media_url`      | string    | URL del archivo subido (en `storage/posts/`)        |
+| `media_type`     | string    | `'image'` o `'video'` — Detectado automáticamente   |
+| `caption`        | text      | Descripción/caption de la publicación               |
+| `is_exclusive`   | boolean   | `false` = pública, `true` = contenido exclusivo     |
+| `coin_cost`      | integer   | Costo en monedas para desbloquear (si es exclusiva) |
+| `likes_count`    | integer   | Contador de likes (default 0)                       |
+| `comments_count` | integer   | Contador de comentarios (default 0)                 |
+| `created_at`     | timestamp |                                                     |
+| `updated_at`     | timestamp |                                                     |
+
+**IMPORTANTE sobre `type`:**
+
+- `post` → Publicación normal. Acepta imágenes Y videos.
+- `reel` → Video corto. **SOLO acepta videos** (el backend valida esto y rechaza imágenes).
+- `live` → Reservado para futuro uso (video en vivo). NO implementado aún.
+
+#### Tabla `stories`
+
+| Columna        | Tipo      | Descripción                                      |
+| -------------- | --------- | ------------------------------------------------ |
+| `id`           | bigint PK | ID autoincremental                               |
+| `user_id`      | FK→users  | Usuario que subió la historia                    |
+| `media_url`    | string    | URL del archivo subido (en `storage/stories/`)   |
+| `media_type`   | enum      | `'image'` o `'video'`                            |
+| `is_exclusive` | boolean   | `false` = pública, `true` = exclusiva            |
+| `expires_at`   | timestamp | Fecha/hora de expiración (24h después de subida) |
+| `created_at`   | timestamp |                                                  |
+| `updated_at`   | timestamp |                                                  |
+
+**IMPORTANTE:** Las historias expiran automáticamente 24 horas después de crearse. La query de `myStories` filtra por `expires_at > now()`.
+
+#### Tabla `highlights`
+
+| Columna        | Tipo      | Descripción                                            |
+| -------------- | --------- | ------------------------------------------------------ |
+| `id`           | bigint PK | ID autoincremental                                     |
+| `user_id`      | FK→users  | Usuario dueño del highlight                            |
+| `title`        | string    | Nombre de la historia destacada (máx 50 chars)         |
+| `cover_url`    | string    | URL de la imagen de portada (en `storage/highlights/`) |
+| `is_exclusive` | boolean   | `false` = pública, `true` = exclusiva                  |
+| `created_at`   | timestamp |                                                        |
+| `updated_at`   | timestamp |                                                        |
+
+#### Tabla `highlight_story` (Pivot)
+
+| Columna        | Tipo          | Descripción                       |
+| -------------- | ------------- | --------------------------------- |
+| `id`           | bigint PK     | ID autoincremental                |
+| `highlight_id` | FK→highlights | Referencia al highlight           |
+| `story_id`     | FK→stories    | Referencia a la historia guardada |
+| `created_at`   | timestamp     |                                   |
+| `updated_at`   | timestamp     |                                   |
+
+**Relación Many-to-Many:** Una historia puede pertenecer a múltiples highlights, y un highlight puede contener múltiples historias.
+
+### Modelos y Relaciones
+
+#### Post
+
+- `user()` → BelongsTo(User)
+- Fillable: `user_id`, `type`, `media_url`, `media_type`, `caption`, `is_exclusive`, `coin_cost`, `likes_count`, `comments_count`
+
+#### Story
+
+- `user()` → BelongsTo(User)
+- `highlights()` → BelongsToMany(Highlight) — Pivot `highlight_story`
+- Cast: `expires_at` → datetime
+- Fillable: `user_id`, `media_url`, `media_type`, `is_exclusive`, `expires_at`
+
+#### Highlight
+
+- `user()` → BelongsTo(User)
+- `stories()` → BelongsToMany(Story) — Pivot `highlight_story`
+- Fillable: `user_id`, `title`, `cover_url`, `is_exclusive`
+
+#### User (relaciones nuevas)
+
+- `posts()` → HasMany(Post)
+- `stories()` → HasMany(Story)
+- `highlights()` → HasMany(Highlight)
+
+### Controlador: `ContentController.php`
+
+**Archivo:** `app/Http/Controllers/Api/ContentController.php`
+
+#### Endpoints
+
+| Método | Ruta                               | Función          | Descripción                                     |
+| ------ | ---------------------------------- | ---------------- | ----------------------------------------------- |
+| POST   | `/api/content/post`                | `storePost`      | Crear publicación o reel (con archivo)          |
+| POST   | `/api/content/story`               | `storeStory`     | Crear historia (con archivo, expira en 24h)     |
+| POST   | `/api/content/highlight`           | `storeHighlight` | Crear historia destacada (con título y portada) |
+| GET    | `/api/content/my-posts`            | `myPosts`        | Obtener mis posts/reels (filtrado por query)    |
+| GET    | `/api/content/my-stories`          | `myStories`      | Obtener mis historias activas (no expiradas)    |
+| GET    | `/api/content/my-highlights`       | `myHighlights`   | Obtener mis highlights con sus stories          |
+| GET    | `/api/content/user/{userId}/posts` | `userPosts`      | Obtener posts de otro usuario                   |
+| DELETE | `/api/content/post/{id}`           | `destroyPost`    | Eliminar post propio                            |
+| DELETE | `/api/content/story/{id}`          | `destroyStory`   | Eliminar historia propia                        |
+
+#### Query Parameters para `myPosts` y `userPosts`
+
+- `type` → `post` o `reel` (default: `post`)
+- `exclusive` → `0` o `1` (si se omite, trae todos)
+
+**Ejemplos de uso:**
+
+```
+GET /api/content/my-posts?type=post&exclusive=0   → Mis publicaciones públicas
+GET /api/content/my-posts?type=reel&exclusive=0   → Mis reels públicos
+GET /api/content/my-posts?type=post&exclusive=1   → Mis publicaciones exclusivas
+GET /api/content/my-posts?type=reel&exclusive=1   → Mis reels exclusivos
+```
+
+#### Validaciones del Backend
+
+- **Reels SOLO aceptan video.** Si envías una imagen como reel, el backend responde con error 422: `"Los reels deben ser videos."`
+- **Archivos permitidos:** jpeg, png, jpg, gif, mp4, mov, webm
+- **Tamaño máximo de archivo:** 50MB (51200 KB)
+- **Al crear un post:** Si `is_exclusive = true`, el `coin_cost` se establece automáticamente en 5 (o el valor enviado). Si `is_exclusive = false`, `coin_cost` siempre es 0.
+- **Al crear un post/reel:** Se incrementa automáticamente `users.posts_count`. Al eliminar, se decrementa.
+- **Al crear una historia:** Se calcula `expires_at = now() + 24 hours` automáticamente.
+
+#### Almacenamiento de Archivos
+
+- Los archivos se guardan en `storage/app/public/` bajo subcarpetas:
+    - Posts/Reels → `storage/app/public/posts/`
+    - Stories → `storage/app/public/stories/`
+    - Highlights (portada) → `storage/app/public/highlights/`
+- Se requiere `php artisan storage:link` para que sean accesibles públicamente.
+- Las URLs se generan con `asset('storage/' . $path)`.
+
+### Migraciones
+
+| Archivo                                                    | Descripción                                           |
+| ---------------------------------------------------------- | ----------------------------------------------------- |
+| `2026_02_21_230504_create_posts_table.php`                 | Tabla posts con type, media, caption, exclusive, cost |
+| `2026_02_21_230504_create_stories_table.php`               | Tabla stories con media, exclusive, expires_at        |
+| `2026_02_21_230505_create_highlights_table.php`            | Tabla highlights con title, cover, exclusive          |
+| `2026_02_21_230600_create_highlight_story_table.php`       | Tabla pivot highlight↔story (many-to-many)            |
+| `2026_02_21_232529_add_is_exclusive_to_content_tables.php` | Agrega `is_exclusive` a posts, stories, highlights    |

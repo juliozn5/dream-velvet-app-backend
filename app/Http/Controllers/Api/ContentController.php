@@ -91,15 +91,15 @@ class ContentController extends Controller
     {
         $request->validate([
             'title' => 'required|string|max:50',
-            'cover' => 'nullable|file|mimes:jpeg,png,jpg|max:10240',
+            'file' => 'required|file|mimes:mp4,mov,webm,jpg,jpeg,png,gif|max:51200',
             'is_exclusive' => 'required|boolean',
         ]);
 
         $user = $request->user();
         $coverUrl = null;
 
-        if ($request->hasFile('cover')) {
-            $path = $request->file('cover')->store('highlights', 'public');
+        if ($request->hasFile('file')) {
+            $path = $request->file('file')->store('highlights', 'public');
             $coverUrl = asset('storage/' . $path);
         }
 
@@ -152,7 +152,7 @@ class ContentController extends Controller
     public function myHighlights(Request $request)
     {
         $highlights = Highlight::where('user_id', $request->user()->id)
-            ->with('stories')
+            ->with(['stories', 'user:id,name,avatar'])
             ->orderBy('created_at', 'desc')
             ->get();
 
